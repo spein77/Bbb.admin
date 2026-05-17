@@ -90,6 +90,10 @@ const UPLOAD_PRESET = "biabu_unsigned";
 const BIN_ID = "6a09d43bc0954111d8389955";
 const API_KEY = "$2a$10$yFXpRcxRgSwYhQxVfIP8uuOkb6Eygb715yJAhy8mIH72DSXH1F42C";
 
+// Tumia proxy kuepuka CORS error
+const PROXY_URL = "https://api.allorigins.win/raw?url=";
+const JSONBIN_URL = "https://api.jsonbin.io/v3/b/";
+
 let data = {
   logo:'', name:'Biabu Floral Art', phone:'', whatsappLink:'',
   location:'Morogoro. Kwa sasa', items:[]
@@ -99,7 +103,7 @@ let uploadedImgUrl = '';
 
 async function loadData(){
   try{
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`,{
+    const res = await fetch(PROXY_URL + encodeURIComponent(JSONBIN_URL + BIN_ID + "/latest"),{
       headers: {'X-Master-Key': API_KEY}
     });
     const result = await res.json();
@@ -109,20 +113,33 @@ async function loadData(){
     document.getElementById('phone').value = data.phone;
     document.getElementById('whatsappLink').value = data.whatsappLink;
     document.getElementById('location').value = data.location;
-    document.getElementById('logoPreview').src = data.logo;
-    document.getElementById('logoPreview').style.display = data.logo? 'block' : 'none';
+    if(data.logo){
+      document.getElementById('logoPreview').src = data.logo;
+      document.getElementById('logoPreview').style.display = 'block';
+    }
   }catch(e){console.log('Hakuna data bado')}
 }
 
 async function saveData(){
-  await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`,{
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Master-Key': API_KEY
-    },
-    body: JSON.stringify(data)
-  });
+  try{
+    const res = await fetch(PROXY_URL + encodeURIComponent(JSONBIN_URL + BIN_ID),{
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': API_KEY
+      },
+      body: JSON.stringify(data)
+    });
+
+    if(!res.ok){
+      alert('Imeshindwa kuhifadhi. Jaribu tena.');
+      return false;
+    }
+    return true;
+  }catch(e){
+    alert('Kuna shida ya mtandao');
+    return false;
+  }
 }
 
 async function uploadToCloudinary(file){
@@ -146,7 +163,7 @@ document.getElementById('logoUpload').onchange = async e=>{
     document.getElementById('logoPreview').src = url;
     document.getElementById('logoPreview').style.display = 'block';
     data.logo = url;
-    saveData();
+    await saveData();
   }
 };
 
@@ -164,16 +181,16 @@ document.getElementById('imgUpload').onchange = async e=>{
   }
 };
 
-function saveSettings(){
+async function saveSettings(){
   data.name = document.getElementById('bizName').value;
   data.phone = document.getElementById('phone').value;
   data.whatsappLink = document.getElementById('whatsappLink').value;
   data.location = document.getElementById('location').value;
-  saveData();
-  alert('Mipangilio imehifadhiwa!');
+  const ok = await saveData();
+  if(ok) alert('Mipangilio imehifadhiwa!');
 }
 
-function addItem(){
+async function addItem(){
   if(!uploadedImgUrl){alert('Subiri picha ipakie kwanza');return;}
   const item = {
     img: uploadedImgUrl,
@@ -183,21 +200,23 @@ function addItem(){
   };
   if(!item.title){alert('Weka jina');return;}
   data.items.push(item);
-  saveData();
-  loadItems();
-  document.getElementById('title').value='';
-  document.getElementById('desc').value='';
-  document.getElementById('price').value='';
-  document.getElementById('imgPreview').src='';
-  document.getElementById('imgPreview').style.display='none';
-  uploadedImgUrl = '';
-  alert('Picha imeongezwa! Kila mtu ataiona sasa.');
+  const ok = await saveData();
+  if(ok){
+    loadItems();
+    document.getElementById('title').value='';
+    document.getElementById('desc').value='';
+    document.getElementById('price').value='';
+    document.getElementById('imgPreview').src='';
+    document.getElementById('imgPreview').style.display='none';
+    uploadedImgUrl = '';
+    alert('Picha imeongezwa! Kila mtu ataiona sasa.');
+  }
 }
 
-function deleteItem(index){
+async function deleteItem(index){
   if(confirm('Una uhakika unataka kufuta?')){
     data.items.splice(index,1);
-    saveData();
+    await saveData();
     loadItems();
   }
 }
