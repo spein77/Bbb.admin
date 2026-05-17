@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - Biabu Floral Art</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:Arial;background:#f5f5f5;padding:20px;}
+.container{max-width:800px;margin:0 auto;background:#fff;padding:30px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
+h1{color:#8B0000;margin-bottom:20px;}
+h2{color:#333;margin:20px 0 10px;}
+.form-group{margin-bottom:15px;}
+label{display:block;margin-bottom:5px;font-weight:700;}
+input,textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:5px;font-size:16px;}
+textarea{height:80px;resize:vertical;}
+button{background:#8B0000;color:#fff;padding:12px 25px;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin-top:10px;}
+button:hover{background:#a00;}
+button:disabled{background:#999;cursor:not-allowed;}
+.item-list{margin-top:20px;}
+.item{background:#f9f9f9;padding:15px;margin-bottom:10px;border-radius:5px;display:flex;gap:15px;align-items:center;}
+.item img{width:80px;height:80px;object-fit:cover;border-radius:5px;}
+.delete{background:#dc3545;padding:8px 15px;font-size:14px;}
+.preview{max-width:200px;margin-top:10px;display:none;}
+.loading{display:none;color:#8B0000;}
+hr{margin:30px 0;border:none;border-top:1px solid #ddd;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Admin Panel - Biabu Floral Art</h1>
+
+  <h2>Mipangilio ya Duka</h2>
+  <div class="form-group">
+    <label>Logo ya Duka</label>
+    <input type="file" id="logoUpload" accept="image/*">
+    <p class="loading" id="logoLoading">Inapakia logo...</p>
+    <img id="logoPreview" class="preview">
+  </div>
+  <div class="form-group">
+    <label>Jina la Biashara</label>
+    <input type="text" id="bizName" value="Biabu Floral Art">
+  </div>
+  <div class="form-group">
+    <label>Namba ya Simu</label>
+    <input type="text" id="phone" placeholder="0775667472">
+  </div>
+  <div class="form-group">
+    <label>Link ya WhatsApp</label>
+    <input type="text" id="whatsappLink" placeholder="https://wa.me/255775667472">
+  </div>
+  <div class="form-group">
+    <label>Mahali</label>
+    <input type="text" id="location" value="Morogoro. Kwa sasa">
+  </div>
+  <button onclick="saveSettings()">Hifadhi Mipangilio</button>
+
+  <hr>
+
+  <h2>Ongeza Picha Mpya</h2>
+  <div class="form-group">
+    <label>Chagua Picha</label>
+    <input type="file" id="imgUpload" accept="image/*">
+    <p class="loading" id="imgLoading">Inapakia picha...</p>
+    <img id="imgPreview" class="preview">
+  </div>
+  <div class="form-group">
+    <label>Jina la Picha</label>
+    <input type="text" id="title" placeholder="Mf: Piko ya Kiarabu">
+  </div>
+  <div class="form-group">
+    <label>Maelezo</label>
+    <textarea id="desc" placeholder="Maelezo mafupi"></textarea>
+  </div>
+  <div class="form-group">
+    <label>Bei (Tsh)</label>
+    <input type="number" id="price" placeholder="45000">
+  </div>
+  <button id="addBtn" onclick="addItem()">Ongeza Picha</button>
+
+  <hr>
+
+  <h2>Picha Zilizopo</h2>
+  <div id="itemsList" class="item-list"></div>
+</div>
+
+<script>
+const CLOUD_NAME = "duev05m8b";
+const UPLOAD_PRESET = "biabu_unsigned";
+const BIN_ID = "6a09d43bc0954111d8389955";
+const API_KEY = "$2a$10$yFXpRcxRgSwYhQxVfIP8uuOkb6Eygb715yJAhy8mIH72DSXH1F42C";
+
+let data = {
+  logo:'', name:'Biabu Floral Art', phone:'', whatsappLink:'',
+  location:'Morogoro. Kwa sasa', items:[]
+};
+
+let uploadedImgUrl = '';
+
+async function loadData(){
+  try{
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`,{
+      headers: {'X-Master-Key': API_KEY}
+    });
+    const result = await res.json();
+    data = result.record;
+    loadItems();
+    document.getElementById('bizName').value = data.name;
+    document.getElementById('phone').value = data.phone;
+    document.getElementById('whatsappLink').value = data.whatsappLink;
+    document.getElementById('location').value = data.location;
+    document.getElementById('logoPreview').src = data.logo;
+    document.getElementById('logoPreview').style.display = data.logo? 'block' : 'none';
+  }catch(e){console.log('Hakuna data bado')}
+}
+
+async function saveData(){
+  await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`,{
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Master-Key': API_KEY
+    },
+    body: JSON.stringify(data)
+  });
+}
+
+async function uploadToCloudinary(file){
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{
+    method:'POST', body:formData
+  });
+  const data = await res.json();
+  return data.secure_url;
+}
+
+document.getElementById('logoUpload').onchange = async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('logoLoading').style.display = 'block';
+  const url = await uploadToCloudinary(file);
+  document.getElementById('logoLoading').style.display = 'none';
+  if(url){
+    document.getElementById('logoPreview').src = url;
+    document.getElementById('logoPreview').style.display = 'block';
+    data.logo = url;
+    saveData();
+  }
+};
+
+document.getElementById('imgUpload').onchange = async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('imgLoading').style.display = 'block';
+  document.getElementById('addBtn').disabled = true;
+  uploadedImgUrl = await uploadToCloudinary(file);
+  document.getElementById('imgLoading').style.display = 'none';
+  document.getElementById('addBtn').disabled = false;
+  if(uploadedImgUrl){
+    document.getElementById('imgPreview').src = uploadedImgUrl;
+    document.getElementById('imgPreview').style.display = 'block';
+  }
+};
+
+function saveSettings(){
+  data.name = document.getElementById('bizName').value;
+  data.phone = document.getElementById('phone').value;
+  data.whatsappLink = document.getElementById('whatsappLink').value;
+  data.location = document.getElementById('location').value;
+  saveData();
+  alert('Mipangilio imehifadhiwa!');
+}
+
+function addItem(){
+  if(!uploadedImgUrl){alert('Subiri picha ipakie kwanza');return;}
+  const item = {
+    img: uploadedImgUrl,
+    title: document.getElementById('title').value,
+    desc: document.getElementById('desc').value,
+    price: document.getElementById('price').value
+  };
+  if(!item.title){alert('Weka jina');return;}
+  data.items.push(item);
+  saveData();
+  loadItems();
+  document.getElementById('title').value='';
+  document.getElementById('desc').value='';
+  document.getElementById('price').value='';
+  document.getElementById('imgPreview').src='';
+  document.getElementById('imgPreview').style.display='none';
+  uploadedImgUrl = '';
+  alert('Picha imeongezwa! Kila mtu ataiona sasa.');
+}
+
+function deleteItem(index){
+  if(confirm('Una uhakika unataka kufuta?')){
+    data.items.splice(index,1);
+    saveData();
+    loadItems();
+  }
+}
+
+function loadItems(){
+  const list = document.getElementById('itemsList');
+  list.innerHTML='';
+  if(data.items.length === 0){
+    list.innerHTML = '<p style="color:#999;">Bado hakuna picha</p>';
+    return;
+  }
+  data.items.forEach((item,i)=>{
+    list.innerHTML += `
+      <div class="item">
+        <img src="${item.img}">
+        <div style="flex:1;">
+          <strong>${item.title}</strong><br>
+          <small>${item.desc}</small><br>
+          <strong style="color:#8B0000;">Tsh ${item.price}</strong>
+        </div>
+        <button class="delete" onclick="deleteItem(${i})">Futa</button>
+      </div>
+    `;
+  });
+}
+
+loadData();
+</script>
+</body>
+</html>
